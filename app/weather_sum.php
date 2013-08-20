@@ -10,28 +10,35 @@ $dnsResolver = $dnsResolverFactory->createCached('8.8.8.8', $loop);
 $factory = new React\HttpClient\Factory();
 $client = $factory->create($loop, $dnsResolver);
 
-$request = $client->request('GET', 'http://api.openweathermap.org/data/2.5/weather?q=London');
-$request->on('response', function ($response) {
-    $buffer = '';
+$cities = array('London', 'Manchester');
+$tempSum = 0;
 
-    $response->on('data', function ($data) use (&$buffer) {
-        $buffer .= $data;
-        echo ".";
+foreach($cities as $city) {
+    $request = $client->request('GET', 'http://api.openweathermap.org/data/2.5/weather?q=' . $city);
+    $request->on('response', function ($response) use(&$tempSum) {
+        $buffer = '';
+
+        $response->on('data', function ($data) use (&$buffer) {
+            $buffer .= $data;
+        });
+
+        $response->on('end', function () use (&$buffer, &$tempSum) {
+            $decoded = json_decode($buffer, true);
+            $temp = convertKelvinToCelcius($decoded['main']['temp']);
+            $tempSum += $temp;
+        });
     });
-
-    $response->on('end', function () use (&$buffer) {
-        $decoded = json_decode($buffer, true);
-        #$latest = $decoded[0]['commit'];
-        #$author = $latest['author']['name'];
-        #$date = date('F j, Y', strtotime($latest['author']['date']));
-
-        echo "\n";
-        echo print_r($decoded, true) . "\n";
+    $request->on('end', function ($error, $response) {
+        echo $error;
     });
-});
-$request->on('end', function ($error, $response) {
-    echo $error;
-});
-$request->end();
+    $request->end();
+}
 
 $loop->run();
+$tempAvg = $tempSum / count($cities);
+echo "Average temperature in England: " . $tempAvg . "\n";
+
+function convertKelvinToCelcius($kelvinValue)
+{
+    return $kelvinValue - 273.15;
+}
