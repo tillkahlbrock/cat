@@ -10,7 +10,27 @@ $dnsResolver = $dnsResolverFactory->createCached('8.8.8.8', $loop);
 $factory = new React\HttpClient\Factory();
 $client = $factory->create($loop, $dnsResolver);
 
-$cities = array('London', 'Manchester');
+$cities = array();
+
+$request = $client->request('GET', 'http://127.0.0.1:6000/uk/cities');
+$request->on('response', function ($response) use (&$cities) {
+    $buffer = '';
+
+    $response->on('data', function ($data) use (&$buffer) {
+        $buffer .= $data;
+    });
+
+    $response->on('end', function () use (&$buffer, &$cities) {
+        $cities = json_decode($buffer, true);
+    });
+});
+$request->on('end', function ($error, $response) {
+    echo $error;
+});
+$request->end();
+
+$loop->run();
+
 $tempSum = 0;
 
 foreach($cities as $city) {
@@ -35,8 +55,9 @@ foreach($cities as $city) {
 }
 
 $loop->run();
-$tempAvg = $tempSum / count($cities);
-echo "Average temperature in England: " . $tempAvg . "\n";
+$i = count($cities);
+$tempAvg = $tempSum / ($i > 0 ? $i : 1);
+echo "Average (" . $i . ") temperature in England: " . $tempAvg . "\n";
 
 function convertKelvinToCelcius($kelvinValue)
 {
