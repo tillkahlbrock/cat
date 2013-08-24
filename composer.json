@@ -1,5 +1,5 @@
 {
     "require": {
-        "react/react": "0.3.*"
+        "react/promise": "*"
     }
 }
