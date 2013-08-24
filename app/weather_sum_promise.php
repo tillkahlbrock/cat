@@ -10,10 +10,14 @@ function retrieveCities($country, $resolver)
     $response = $browser->get('http://127.0.0.1:6000/' . $country . '/cities');
     
     if (!$response->isSuccessful()) {
-        return $resolver->reject('can not fetch cities for ' . $country);
+        $resolver->reject('can not fetch cities for ' . $country . "\n");
     }
-    
-    return $resolver->resolve(json_decode($response->getContent(), true));
+    $cities = json_decode($response->getContent(), true);
+    $result = array(
+        'country' => $country,
+        'cities' => $cities
+    );
+    $resolver->resolve($result);
 }
 
 function getCities($country)
@@ -29,6 +33,7 @@ function retrieveTemperature($city)
 {
     $browser = new Buzz\Browser();
     $response = $browser->get('http://api.openweathermap.org/data/2.5/weather?q=' . $city);
+
     $decoded = json_decode($response->getContent(), true);
     $temp = convertKelvinToCelcius($decoded['main']['temp']);
 
@@ -42,24 +47,23 @@ function convertKelvinToCelcius($kelvinValue)
 
 function main()
 {
-#    $country = "uk";
-#    $cities = retrieveCities($country);
-#    $sum = 0;
-
-#    foreach ($cities as $city) {
-#        $sum += retrieveTemperature($city);
-#    }
-
-#    $avg = $sum / (count($cities) > 0 ? count($cities) : 1);
-
-#    echo "Avg temperature of " . $country . ": " . $avg . "°C\n";
-
-    getCities("uk")->then(
+    getCities("fr")
+    ->then(
         function($result) { 
-            print_r($result); 
+            return $result;
         },
         function($reason) {
             echo $reason;
+        }
+    )->then(
+        function($result) {
+            $sum = 0;
+            foreach ($result['cities'] as $city) {
+                $sum += retrieveTemperature($city);
+            }
+            $numCities = count($result['cities']);
+            $avg = $sum / ($numCities > 0 ? $numCities : 1);
+            echo "Avg temperature of " . $result['country'] . ": " . $avg . "°C\n";
         }
     );
 }
