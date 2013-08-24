@@ -1,5 +1,6 @@
 {
     "require": {
-        "react/promise": "*"
+        "react/promise": "*",
+        "kriswallsmith/buzz": "*"
     }
 }
