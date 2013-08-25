@@ -28,7 +28,7 @@ function convertKelvinToCelcius($kelvinValue)
 
 function main()
 {
-    $country = "uk";
+    $country = "de";
     $cities = retrieveCities($country);
     $sum = 0;
 
@@ -36,7 +36,7 @@ function main()
         $sum += retrieveTemperature($city);
     }
 
-    $avg = $sum / (count($cities) > 0 ? count($cities) : 1);
+    $avg = round($sum / (count($cities) > 0 ? count($cities) : 1), 1);
 
     echo "Avg temperature of " . $country . ": " . $avg . "°C\n";
 }

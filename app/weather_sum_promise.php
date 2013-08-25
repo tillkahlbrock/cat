@@ -8,7 +8,7 @@ function retrieveCities($country)
 {
     $browser = new Buzz\Browser();
     $response = $browser->get('http://127.0.0.1:6000/' . $country . '/cities');
-    
+
     if (!$response->isSuccessful()) {
         throw new Exception('can not fetch cities for ' . $country . "\n");
     }
@@ -41,8 +41,11 @@ function retrieveTemperature($city, $client, $resolver)
 
         $response->on('end', function () use (&$buffer, $resolver) {
             $decoded = json_decode($buffer, true);
-            $temp = convertKelvinToCelcius($decoded['main']['temp']);
-            $resolver->resolve($temp);
+            if (isset($decoded['main']['temp'])) {
+                $temp = convertKelvinToCelcius($decoded['main']['temp']);
+                $resolver->resolve($temp);
+            }
+            $resolver->reject("could not retrieve temperature:\n" . print_r($decoded, true));
         });
     });
     $request->on('end', function ($error, $response) {
@@ -68,20 +71,23 @@ function main()
 
     $result = retrieveCities("de");
 
-    $sum = 0;
+    $sum = array('count' => 0, 'sum' => 0);
 
     foreach ($result['cities'] as $city) {
         getTemperature($city, $client)
             ->then(
-                function ($result) use(&$sum) { $sum += $result; },
+                function ($result) use(&$sum) {
+                    $sum['sum'] += $result;
+                    $sum['count'] += 1;
+                },
                 function ($reason) { echo $reason; }
             );
     }
 
     $loop->run();
 
-    $numCities = count($result['cities']);
-    $avg = round($sum / ($numCities > 0 ? $numCities : 1), 1);
+    $numCities = $sum['count'] > 0 ? $sum['count'] : 1;
+    $avg = round($sum['sum'] / $numCities, 1);
     echo "Avg temperature of " . $result['country'] . ": " . $avg . "°C\n";
 
 }
