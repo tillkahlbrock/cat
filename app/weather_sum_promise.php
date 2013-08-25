@@ -31,16 +31,33 @@ function getTemperature($city)
 
 function retrieveTemperature($city, $resolver)
 {
-    $browser = new Buzz\Browser();
-    $response = $browser->get('http://api.openweathermap.org/data/2.5/weather?q=' . $city);
+    $loop = React\EventLoop\Factory::create();
 
-    if (!$response->isSuccessful()) {
-        $resolver->reject('can not fetch temperature for ' . $city . "\n");
-    }
-    $decoded = json_decode($response->getContent(), true);
-    $temp = convertKelvinToCelcius($decoded['main']['temp']);
+    $dnsResolverFactory = new React\Dns\Resolver\Factory();
+    $dnsResolver = $dnsResolverFactory->createCached('8.8.8.8', $loop);
 
-    $resolver->resolve($temp);
+    $factory = new React\HttpClient\Factory();
+    $client = $factory->create($loop, $dnsResolver);
+
+    $request = $client->request('GET', 'http://api.openweathermap.org/data/2.5/weather?q=' . $city);
+    $request->on('response', function ($response) use($resolver) {
+        $buffer = '';
+
+        $response->on('data', function ($data) use (&$buffer) {
+            $buffer .= $data;
+        });
+
+        $response->on('end', function () use (&$buffer, $resolver) {
+            $decoded = json_decode($buffer, true);
+            $temp = convertKelvinToCelcius($decoded['main']['temp']);
+            $resolver->resolve($temp);
+        });
+    });
+    $request->on('end', function ($error, $response) {
+        echo $error;
+    });
+    $request->end();
+    $loop->run();
 }
 
 function convertKelvinToCelcius($kelvinValue)
@@ -50,7 +67,7 @@ function convertKelvinToCelcius($kelvinValue)
 
 function main()
 {
-    $result = retrieveCities("fr");
+    $result = retrieveCities("de");
 
     $sum = 0;
 
@@ -63,7 +80,7 @@ function main()
     }
 
     $numCities = count($result['cities']);
-    $avg = $sum / ($numCities > 0 ? $numCities : 1);
+    $avg = round($sum / ($numCities > 0 ? $numCities : 1), 1);
     echo "Avg temperature of " . $result['country'] . ": " . $avg . "°C\n";
 
 }

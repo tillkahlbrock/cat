@@ -1,6 +1,7 @@
 {
     "require": {
         "react/promise": "*",
+        "react/react": "0.3.*",
         "kriswallsmith/buzz": "*"
     }
 }
