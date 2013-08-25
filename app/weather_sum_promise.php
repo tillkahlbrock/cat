@@ -20,25 +20,17 @@ function retrieveCities($country)
     return $result;
 }
 
-function getTemperature($city)
+function getTemperature($city, $client)
 {
     $deferred = new React\Promise\Deferred();
 
-    retrieveTemperature($city, $deferred->resolver());
+    retrieveTemperature($city, $client, $deferred->resolver());
 
     return $deferred->promise();
 }
 
-function retrieveTemperature($city, $resolver)
+function retrieveTemperature($city, $client, $resolver)
 {
-    $loop = React\EventLoop\Factory::create();
-
-    $dnsResolverFactory = new React\Dns\Resolver\Factory();
-    $dnsResolver = $dnsResolverFactory->createCached('8.8.8.8', $loop);
-
-    $factory = new React\HttpClient\Factory();
-    $client = $factory->create($loop, $dnsResolver);
-
     $request = $client->request('GET', 'http://api.openweathermap.org/data/2.5/weather?q=' . $city);
     $request->on('response', function ($response) use($resolver) {
         $buffer = '';
@@ -57,7 +49,6 @@ function retrieveTemperature($city, $resolver)
         echo $error;
     });
     $request->end();
-    $loop->run();
 }
 
 function convertKelvinToCelcius($kelvinValue)
@@ -67,17 +58,27 @@ function convertKelvinToCelcius($kelvinValue)
 
 function main()
 {
+    $loop = React\EventLoop\Factory::create();
+
+    $dnsResolverFactory = new React\Dns\Resolver\Factory();
+    $dnsResolver = $dnsResolverFactory->createCached('8.8.8.8', $loop);
+
+    $factory = new React\HttpClient\Factory();
+    $client = $factory->create($loop, $dnsResolver);
+
     $result = retrieveCities("de");
 
     $sum = 0;
 
     foreach ($result['cities'] as $city) {
-        getTemperature($city)
+        getTemperature($city, $client)
             ->then(
                 function ($result) use(&$sum) { $sum += $result; },
                 function ($reason) { echo $reason; }
             );
     }
+
+    $loop->run();
 
     $numCities = count($result['cities']);
     $avg = round($sum / ($numCities > 0 ? $numCities : 1), 1);
