@@ -68,18 +68,27 @@ function main()
 
     $sum = array('count' => 0, 'sum' => 0);
 
+    $promises = array();
+
     foreach ($cities as $city) {
-        getTemperature($city, $client)
-            ->then(
-                function ($result) use (&$sum) {
-                    $sum['sum'] += $result;
-                    $sum['count'] += 1;
-                },
-                function ($reason) {
-                    echo $reason;
-                }
-            );
+        $promises[] = getTemperature($city, $client);
     }
+    React\Promise\When::reduce(
+        $promises,
+        function ($sum, $val) {
+            $sum['sum'] += $val;
+            $sum['count'] += 1;
+            return $sum;
+        },
+        array('count' => 0, 'sum' => 0)
+    )->then(
+            function ($result) use (&$sum) {
+                $sum = $result;
+            },
+            function ($reason) {
+                echo $reason;
+            }
+        );
 
     $loop->run();
 
