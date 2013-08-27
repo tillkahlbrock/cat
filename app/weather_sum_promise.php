@@ -2,23 +2,7 @@
 
 require __DIR__.'/../vendor/autoload.php';
 
-$cities = array();
-
-function retrieveCities($country)
-{
-    $browser = new Buzz\Browser();
-    $response = $browser->get('http://127.0.0.1:6000/' . $country . '/cities');
-
-    if (!$response->isSuccessful()) {
-        throw new Exception('can not fetch cities for ' . $country . "\n");
-    }
-    $cities = json_decode($response->getContent(), true);
-    $result = array(
-        'country' => $country,
-        'cities' => $cities
-    );
-    return $result;
-}
+use \Cat\City\Service as CityService;
 
 function getTemperature($city, $client)
 {
@@ -69,11 +53,12 @@ function main()
     $factory = new React\HttpClient\Factory();
     $client = $factory->create($loop, $dnsResolver);
 
-    $result = retrieveCities("de");
+    $country = 'de';
+    $cities = CityService::getCities($country);
 
     $sum = array('count' => 0, 'sum' => 0);
 
-    foreach ($result['cities'] as $city) {
+    foreach ($cities as $city) {
         getTemperature($city, $client)
             ->then(
                 function ($result) use(&$sum) {
@@ -88,7 +73,7 @@ function main()
 
     $numCities = $sum['count'] > 0 ? $sum['count'] : 1;
     $avg = round($sum['sum'] / $numCities, 1);
-    echo "Avg temperature of " . $result['country'] . ": " . $avg . "°C\n";
+    echo "Avg temperature of " . $country . ": " . $avg . "°C\n";
 
 }
 

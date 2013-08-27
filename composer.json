@@ -3,5 +3,10 @@
         "react/promise": "*",
         "react/react": "0.3.*",
         "kriswallsmith/buzz": "*"
+    },
+    "autoload": {
+        "psr-0": {
+            "Cat\\": "src/"
+        }
     }
 }
