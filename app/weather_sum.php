@@ -4,6 +4,7 @@ use \Cat\City\Service as CityService;
 use \React\HttpClient\Client as HttpClient;
 use \React\HttpClient\Response;
 
+const SYNC = 'sync';
 function getTemperature($city, HttpClient $client)
 {
     $deferred = new React\Promise\Deferred();
@@ -27,18 +28,11 @@ function getTemperature($city, HttpClient $client)
                 function () use (&$buffer, $resolver) {
                     $decoded = json_decode($buffer, true);
                     if (isset($decoded['main']['temp'])) {
-                        $temp = convertKelvinToCelcius($decoded['main']['temp']);
-                        $resolver->resolve($temp);
+                        $resolver->resolve($decoded['main']['temp']);
                     }
                     $resolver->reject("could not retrieve temperature:\n" . print_r($decoded, true));
                 }
             );
-        }
-    );
-    $request->on(
-        'end',
-        function ($error, $response) {
-            echo $error;
         }
     );
     $request->end();
@@ -50,10 +44,12 @@ function retrieveTemperature_sync($city)
 {
     $browser = new Buzz\Browser();
     $response = $browser->get('http://api.openweathermap.org/data/2.5/weather?q=' . $city);
-    $decoded = json_decode($response->getContent(), true);
-    $temp = convertKelvinToCelcius($decoded['main']['temp']);
+    if (!$response->isSuccessful()) {
+        return -1;
+    }
 
-    return $temp;
+    $decoded = json_decode($response->getContent(), true);
+    return $decoded['main']['temp'];
 }
 
 function convertKelvinToCelcius($kelvinValue)
@@ -61,7 +57,7 @@ function convertKelvinToCelcius($kelvinValue)
     return $kelvinValue - 273.15;
 }
 
-function cat_async($country)
+function cat_async($cities)
 {
     $loop = React\EventLoop\Factory::create();
 
@@ -70,8 +66,6 @@ function cat_async($country)
 
     $factory = new React\HttpClient\Factory();
     $client = $factory->create($loop, $dnsResolver);
-
-    $cities = CityService::getCities($country);
 
     $sum = array('count' => 0, 'sum' => 0);
 
@@ -82,8 +76,8 @@ function cat_async($country)
     }
     React\Promise\When::reduce(
         $promises,
-        function ($sum, $val) {
-            $sum['sum'] += $val;
+        function ($sum, $temp) {
+            $sum['sum'] += $temp;
             $sum['count'] += 1;
             return $sum;
         },
@@ -99,21 +93,41 @@ function cat_async($country)
 
     $loop->run();
 
-    $numCities = $sum['count'] > 0 ? $sum['count'] : 1;
-    $avg = round($sum['sum'] / $numCities, 1);
-    echo "Avg temperature of " . $country . ": " . $avg . "°C\n";
+    return $sum;
 }
 
-function cat_sync($country)
+function cat_sync($cities)
 {
-    $cities = CityService::getCities($country);
-    $sum = 0;
+    $sum = array('count' => 0, 'sum' => 0);
+
+    print_r($cities);
 
     foreach ($cities as $city) {
-        $sum += retrieveTemperature_sync($city);
+        $temp = retrieveTemperature_sync($city);
+        if ($temp >= 0) {
+            $sum['sum'] += $temp;
+            $sum['count'] += 1;
+        }
     }
 
-    $avg = round($sum / (count($cities) > 0 ? count($cities) : 1), 1);
+    return $sum;
 
-    echo "Avg temperature of " . $country . ": " . $avg . "°C\n";
+}
+
+function cat($country, $type)
+{
+    $cities = CityService::getCities($country);
+
+    if ($type == SYNC) {
+        $sum = cat_sync($cities);
+    } else {
+        $sum = cat_async($cities);
+    }
+
+    $summedTemperature = $sum['sum'];
+    $processedCities = $sum['count'];
+
+    $avgKelvin = round($summedTemperature / ($processedCities > 0 ? $processedCities : 1), 1);
+    $avgCelcius = convertKelvinToCelcius($avgKelvin);
+    echo "Avg temperature of " . $country . ": " . $avgCelcius . "°C\n";
 }

@@ -16,8 +16,5 @@ DOC;
 $args = Docopt\docopt($doc);
 $country = $args->args['<COUNTRY>'];
 
-if (isset($args->args['--sync']) && $args->args['--sync']) {
-    cat_sync($country);
-} else {
-    cat_async($country);
-}
+$type = (isset($args->args['--sync']) && $args->args['--sync']) ? 'sync' : 'async';
+cat($country, $type);
